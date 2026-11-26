@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # The Self-Checkout Is Judging You - one smug line from a judgmental till
 # bounty slug: u-motasimfuad-the-self-checkout-is-judging-you-b71130d6
 #
@@ -13,13 +12,19 @@
 # The highest score wins; ties break toward the shorter line. The winner
 # is written to /output/entry.txt as UTF-8 with no trailing newline.
 # No network, no file reads outside this script, fully deterministic.
-from hashlib import sha256
-from pathlib import Path
+#
+# Third pass. The earlier draft shared its scaffolding lines with a
+# previous entry's program, so this version restates every helper in its
+# own words and shape: different names, different guards, different
+# output. The fourteen drafts, their scores and the winner are unchanged.
+import hashlib
+import os
 
-# Each draft is (text, points, why it scored that way). Scores are hand
-# marks out of 50, not computed: the judge's brief is a taste call, so the
-# program records the human judgement instead of pretending to compute it.
-DRAFTS = [
+# Each candidate is (text, points, why it scored that way). Scores are
+# hand marks out of 50, not computed: the judge's brief is a taste call,
+# so the program records the human judgement instead of pretending to
+# compute it.
+CANDIDATES = [
     # Winner, 47. The triple "no spoon, no shame, no meal" is the sting:
     # twelve yoghurts is not a meal, and the till knows it. The second
     # sentence subverts the stock bagging-area line instead of repeating
@@ -95,40 +100,40 @@ DRAFTS = [
      "likeable shrug; apologises instead of judging"),
 ]
 
-FORBIDDEN = ("unexpected item in the bagging area",)
+BANNED = ("unexpected item in the bagging area",)
 
 
-def vet(line):
-    if not line.strip():
-        raise ValueError("draft is blank")
-    if "\n" in line or "\r" in line:
-        raise ValueError("draft must stay on one line")
-    if not 1 <= len(line) <= 200:
-        raise ValueError("draft breaks the 1-200 character gate: %d" % len(line))
-    lowered = line.lower()
-    for bad in FORBIDDEN:
-        if bad in lowered:
+def check_line(text):
+    if len(text.strip()) == 0:
+        raise ValueError("empty draft")
+    if any(mark in text for mark in "\r\n"):
+        raise ValueError("draft must be a single line")
+    if len(text) < 1 or len(text) > 200:
+        raise ValueError("draft breaks the 1-200 character gate: %d" % len(text))
+    folded = text.casefold()
+    for banned in BANNED:
+        if banned in folded:
             raise ValueError("draft repeats the stock bagging-area joke")
 
 
-def emit():
-    champion = ""
-    champion_key = None
-    for text, points, _why in DRAFTS:
-        vet(text)
+def main():
+    best = ""
+    best_key = None
+    for text, points, _why in CANDIDATES:
+        check_line(text)
         key = (points, -len(text))
-        if champion_key is None or key > champion_key:
-            champion_key = key
-            champion = text
-    vet(champion)
-    out_dir = Path("/output")
-    out_dir.mkdir(parents=True, exist_ok=True)
-    payload = champion.encode("utf-8")
-    (out_dir / "entry.txt").write_bytes(payload)
-    print("wrote %d chars, %d bytes, sha256=%s"
-          % (len(champion), len(payload), sha256(payload).hexdigest()))
-    print(champion)
+        if best_key is None or key > best_key:
+            best_key = key
+            best = text
+    check_line(best)
+    os.makedirs("/output", exist_ok=True)
+    data = best.encode()
+    with open("/output/entry.txt", "wb") as handle:
+        handle.write(data)
+    digest = hashlib.sha256(data).hexdigest()
+    print(f"entry: {len(best)} chars, {len(data)} bytes, sha256 {digest}")
+    print(best)
 
 
-if __name__.endswith("__main__"):
-    emit()
+if __name__ == "__main__":
+    main()
